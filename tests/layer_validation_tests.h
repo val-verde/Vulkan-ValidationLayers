@@ -302,6 +302,13 @@ class VkDebugPrintfTest : public VkLayerTest {
   protected:
 };
 
+class VkSyncValTest : public VkLayerTest {
+  public:
+    void InitSyncValFramework();
+
+  protected:
+};
+
 class VkBufferTest {
   public:
     enum eTestEnFlags {
