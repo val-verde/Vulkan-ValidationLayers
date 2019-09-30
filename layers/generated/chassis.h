@@ -2759,6 +2759,7 @@ enum LayerObjectTypeId {
     LayerObjectTypeGpuAssisted,                 // Instance or device gpu assisted validation layer object
     LayerObjectTypeDebugPrintf,                 // Instance or device shader debug printf layer object
     LayerObjectTypeCommandCounter,              // Command Counter validation object, child of corechecks
+    LayerObjectTypeSyncValidation,              // Instance or device synchronization validation layer object
     LayerObjectTypeMaxEnum,                     // Max enum count
 };
 
@@ -2793,6 +2794,7 @@ typedef enum ValidationCheckEnables {
 
 typedef enum VkValidationFeatureEnable {
     VK_VALIDATION_FEATURE_ENABLE_SHADER_DEBUG_PRINTF,
+    VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION,
 } VkValidationFeatureEnable;
 
 // CHECK_DISABLED and CHECK_ENABLED vectors are containers for bools that can opt in or out of specific classes of validation
@@ -2821,6 +2823,7 @@ typedef enum EnableFlags {
     best_practices,
     vendor_specific_arm,
     debug_printf,
+    sync_validation,
     // Insert new enables above this line
     kMaxEnableFlags,
 } EnableFlags;
