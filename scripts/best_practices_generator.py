@@ -107,6 +107,7 @@ class BestPracticesOutputGenerator(OutputGenerator):
             'vkAllocateMemory',
             'vkQueuePresentKHR',
             'vkQueueBindSparse',
+            'vkCreateGraphicsPipelines',
             ]
 
         self.extension_info = dict()
