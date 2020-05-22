@@ -4074,7 +4074,7 @@ TEST_F(VkLayerTest, ImageDescriptorLayoutMismatch) {
 
     // Common steps to create the two classes of errors (or two classes of positives)
     auto do_test = [&](VkImageObj *image, vk_testing::ImageView *view, VkImageAspectFlags aspect_mask, VkImageLayout image_layout,
-                       VkImageLayout descriptor_layout, const bool positive_test) {
+                       VkImageLayout descriptor_layout, VkAccessFlags src_mask, VkAccessFlags dst_mask, const bool positive_test) {
         // Set up the descriptor
         img_info.imageView = view->handle();
         img_info.imageLayout = descriptor_layout;
@@ -4083,11 +4083,11 @@ TEST_F(VkLayerTest, ImageDescriptorLayoutMismatch) {
         for (TestType test_type : test_list) {
             cmd_buf.begin();
             // record layout different than actual descriptor layout.
-            const VkFlags read_write = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
-            auto image_barrier = image->image_memory_barrier(read_write, read_write, VK_IMAGE_LAYOUT_UNDEFINED, image_layout,
+            auto image_barrier = image->image_memory_barrier(src_mask, dst_mask, image->Layout(), image_layout,
                                                              image->subresource_range(aspect_mask));
             cmd_buf.PipelineBarrier(VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 0, nullptr, 0,
                                     nullptr, 1, &image_barrier);
+            image->Layout(image_layout);
 
             if (test_type == kExternal) {
                 // The image layout is external to the command buffer we are recording to test.  Submit to push to instance scope.
@@ -4142,7 +4142,7 @@ TEST_F(VkLayerTest, ImageDescriptorLayoutMismatch) {
         }
     };
     do_test(&image, &view, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, /* positive */ false);
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_SHADER_READ_BIT, /* positive */ false);
 
     // Create depth stencil image and views
     const VkFormat format_ds = m_depth_stencil_fmt = FindSupportedDepthStencilFormat(gpu());
@@ -4162,10 +4162,16 @@ TEST_F(VkLayerTest, ImageDescriptorLayoutMismatch) {
         depth_view.init(*m_device, ds_view_ci);
         ds_view_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
         stencil_view.init(*m_device, ds_view_ci);
-        do_test(&image_ds, &depth_view, depth_stencil, ds_image_layout, depth_descriptor_layout, /* positive */ true);
-        do_test(&image_ds, &depth_view, depth_stencil, ds_image_layout, VK_IMAGE_LAYOUT_GENERAL, /* positive */ false);
-        do_test(&image_ds, &stencil_view, depth_stencil, ds_image_layout, stencil_descriptor_layout, /* positive */ true);
-        do_test(&image_ds, &stencil_view, depth_stencil, ds_image_layout, VK_IMAGE_LAYOUT_GENERAL, /* positive */ false);
+        do_test(&image_ds, &depth_view, depth_stencil, ds_image_layout, depth_descriptor_layout, VK_ACCESS_SHADER_READ_BIT,
+                VK_ACCESS_SHADER_READ_BIT, /* positive */ true);
+        do_test(&image_ds, &depth_view, depth_stencil, ds_image_layout, VK_IMAGE_LAYOUT_GENERAL,
+                VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
+                /* positive */ false);
+        do_test(&image_ds, &stencil_view, depth_stencil, ds_image_layout, stencil_descriptor_layout, VK_ACCESS_SHADER_READ_BIT,
+                VK_ACCESS_SHADER_READ_BIT, /* positive */ true);
+        do_test(&image_ds, &stencil_view, depth_stencil, ds_image_layout, VK_IMAGE_LAYOUT_GENERAL,
+                VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
+                /* positive */ false);
     }
 }
 
