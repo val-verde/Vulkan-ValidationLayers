@@ -63,6 +63,27 @@ class ConfigFile {
 
 static ConfigFile layer_config;
 
+#if defined(__ANDROID__)
+const char *GetAndroidProperty(const char *variable) {
+    const int32_t kMaxPropertyLength = 255;
+    string output{};
+    string command = "getprop debug.";
+    command += variable;
+    FILE *pipe = popen(command.c_str(), "r");
+    if (pipe != nullptr) {
+        char result[kMaxPropertyLength];
+        result[0] = '\0';
+        fgets(result, kMaxPropertyLength, pipe);
+        pclose(pipe);
+        size_t count = strcspn(result, "\r\n");
+        if (count > 0) {
+            output = string(result, count);
+        }
+    }
+    return output.c_str();
+}
+#endif
+
 string GetEnvironment(const char *variable) {
 #if !defined(__ANDROID__) && !defined(_WIN32)
     const char *output = getenv(variable);
@@ -82,7 +103,13 @@ string GetEnvironment(const char *variable) {
 #endif
 }
 
-VK_LAYER_EXPORT const char *getLayerOption(const char *option) { return layer_config.GetOption(option); }
+VK_LAYER_EXPORT const char *getLayerOption(const char *option) {
+#if defined(__ANDROID__)
+    return GetAndroidProperty(option);
+#else
+    return layer_config.GetOption(option);
+#endif
+}
 VK_LAYER_EXPORT const char *GetLayerEnvVar(const char *option) {
     layer_config.vk_layer_disables_env_var = GetEnvironment(option);
     return layer_config.vk_layer_disables_env_var.c_str();
