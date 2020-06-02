@@ -23,12 +23,48 @@
  * Author: Shannon McPherson <shannon@lunarg.com>
  * Author: John Zulauf <jzulauf@lunarg.com>
  */
+#include <cctype>
 #include "cast_utils.h"
 #include "layer_validation_tests.h"
+
+#if defined(__ANDROID__)
+// This fcn will convert the layer environment variable name to a proper setting
+// name and set it as an Android Property.
+void SetAndroidProperty(const char *variable, const char *value) {
+    const int32_t kMaxPropertyLength = 255;
+    std::string cut_prefix("VK_LAYER_");
+    std::string setting_name(variable);
+    std::string setting_value(value);
+    auto pos = setting_name.find(cut_prefix);
+    if (pos != std::string::npos) {
+        setting_name.erase(pos, cut_prefix.size());
+    }
+    for (uint32_t i = 0; i < setting_name.size(); i++) {
+        setting_name[i] = std::tolower(setting_name[i]);
+    }
+    std::string command = "setprop debug.khronos_validation.";
+    command += setting_name;
+    command.append(" ");
+    if (setting_value.size() == 0) {
+        command.append("\"\"");
+    } else {
+        command.append(setting_value);
+    }
+    FILE *pipe = popen(command.c_str(), "r");
+    if (pipe != nullptr) {
+        char result[kMaxPropertyLength];
+        result[0] = '\0';
+        fgets(result, kMaxPropertyLength, pipe);
+        pclose(pipe);
+    }
+}
+#endif
 
 void SetEnvVar(const char *env_var, const char *value) {
 #if defined(_WIN32)
     SetEnvironmentVariable(env_var, value);
+#elif defined(__ANDROID__)
+    SetAndroidProperty(env_var, value);
 #else
     setenv(env_var, value, true);
 #endif

@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # Quiet by default
-set +x
+####set +x
 
 echo
 echo === Vulkan Validation Layers Tests ===
@@ -178,6 +178,8 @@ echo
 echo Launching tests...
 
 # Kick off the tests with known exception list
+adb $serialFlag shell su 0 setenforce 0
+adb $serialFlag shell getprop ro.build.type
 adb $serialFlag shell am start -a android.intent.action.MAIN -c android-intent.category.LAUNCH -n com.example.VulkanLayerValidationTests/android.app.NativeActivity --es args --gtest_filter="${filter}"
 
 #
