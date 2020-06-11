@@ -3100,6 +3100,7 @@ void VkLayerTest::OOBRayTracingShadersTestBody(bool gpu_assisted) {
 void VkSyncValTest::InitSyncValFramework() {
     // Enable all vendor-specific checks
     SetEnvVar("VK_LAYER_ENABLES", "VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION");
+    InitFramework(m_errorMonitor);
 }
 
 void print_android(const char *c) {
