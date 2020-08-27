@@ -217,6 +217,8 @@ struct InstanceExtensions {
             return VK_API_VERSION_1_2;
     }
 
+    bool pdev_structs_disallowed = false;
+
     uint32_t InitFromInstanceCreateInfo(uint32_t requested_api_version, const VkInstanceCreateInfo *pCreateInfo) {
 
         static const std::vector<const char *> V_1_1_promoted_instance_apis = {
@@ -257,8 +259,14 @@ struct InstanceExtensions {
                 if (info.state) this->*(info.state) = kEnabledByCreateinfo;
             }
         }
+
+        if (!vk_khr_get_physical_device_properties_2 && (requested_api_version < VK_API_VERSION_1_1)) {
+            pdev_structs_disallowed = true;
+        }
+
         return api_version;
     }
+
 };
 
 static const std::set<std::string> kInstanceExtensionNames = {
@@ -879,12 +887,14 @@ struct DeviceExtensions : public InstanceExtensions {
 
     DeviceExtensions() = default;
     DeviceExtensions(const InstanceExtensions& instance_ext) : InstanceExtensions(instance_ext) {}
+    std::unordered_set<std::string> device_extensions_enumerated{};
 
-    uint32_t InitFromDeviceCreateInfo(const InstanceExtensions *instance_extensions, uint32_t requested_api_version,
-                                      const VkDeviceCreateInfo *pCreateInfo) {
+    uint32_t InitFromDeviceCreateInfo(const InstanceExtensions *instance_extensions, const DeviceExtensions *parent_device_extensions, uint32_t requested_api_version,
+        const VkDeviceCreateInfo *pCreateInfo) {
         // Initialize: this to defaults,  base class fields to input.
         assert(instance_extensions);
         *this = DeviceExtensions(*instance_extensions);
+        device_extensions_enumerated = parent_device_extensions->device_extensions_enumerated;
 
 
         static const std::vector<const char *> V_1_1_promoted_device_apis = {
@@ -963,6 +973,18 @@ struct DeviceExtensions : public InstanceExtensions {
             }
         }
         return api_version;
+    }
+
+    void SetPdevSupport(std::string ext_name) {
+        device_extensions_enumerated.insert(ext_name);
+    }
+
+    bool SupportedByPdev(std::string ext_name) const {
+        auto enum_iter = device_extensions_enumerated.find(ext_name);
+        if ( enum_iter != device_extensions_enumerated.cend()) {
+            return true;
+        }
+        return false;
     }
 };
 

@@ -238,10 +238,30 @@ VKAPI_ATTR VkResult VKAPI_CALL EnumerateInstanceExtensionProperties(const char *
 
 VKAPI_ATTR VkResult VKAPI_CALL EnumerateDeviceExtensionProperties(VkPhysicalDevice physicalDevice, const char *pLayerName,
                                                                   uint32_t *pCount, VkExtensionProperties *pProperties) {
+#ifdef VK_USE_PLATFORM_ANDROID_KHR
+            __android_log_print(ANDROID_LOG_INFO, "VulkanLayerValidationTests", "YYYYYYYYY EDEP, count = %d, layername == NULL %d\n", 
+                *pCount, (pProperties == nullptr));
+#endif
+            //printf("YYYYYYYYY EDEP, count = %d, layername == NULL %d\n", 
+            //    *pCount, (pProperties == nullptr));
+
+
     if (pLayerName && !strcmp(pLayerName, global_layer.layerName)) return util_GetExtensionProperties(ARRAY_SIZE(device_extensions), device_extensions, pCount, pProperties);
     assert(physicalDevice);
     auto layer_data = GetLayerDataPtr(get_dispatch_key(physicalDevice), layer_data_map);
-    return layer_data->instance_dispatch_table.EnumerateDeviceExtensionProperties(physicalDevice, pLayerName, pCount, pProperties);
+    VkResult result = layer_data->instance_dispatch_table.EnumerateDeviceExtensionProperties(physicalDevice, pLayerName, pCount, pProperties);
+    // Record device extensions supported by this physical device
+    if (pProperties) {
+        for (uint32_t i = 0; i < *pCount; i++) {
+            layer_data->device_extensions.SetPdevSupport(pProperties[i].extensionName);
+        }
+    }
+
+#ifdef VK_USE_PLATFORM_ANDROID_KHR
+            __android_log_print(ANDROID_LOG_INFO, "VulkanLayerValidationTests", "YYYYYYYYY EDEP, pdev = %s\n", 
+                layer_data->report_data->FormatHandle(physicalDevice).c_str());
+#endif
+    return result;
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo *pCreateInfo, const VkAllocationCallbacks *pAllocator,
@@ -424,7 +444,8 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateDevice(VkPhysicalDevice gpu, const VkDevice
     uint32_t effective_api_version = std::min(device_properties.apiVersion, instance_interceptor->api_version);
 
     DeviceExtensions device_extensions = {};
-    device_extensions.InitFromDeviceCreateInfo(&instance_interceptor->instance_extensions, effective_api_version, pCreateInfo);
+    device_extensions.InitFromDeviceCreateInfo(&instance_interceptor->instance_extensions, &instance_interceptor->device_extensions, 
+        effective_api_version, pCreateInfo);
     for (auto item : instance_interceptor->object_dispatch) {
         item->device_extensions = device_extensions;
     }
@@ -453,7 +474,7 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateDevice(VkPhysicalDevice gpu, const VkDevice
     // Save local info in device object
     device_interceptor->phys_dev_properties.properties = device_properties;
     device_interceptor->api_version = device_interceptor->device_extensions.InitFromDeviceCreateInfo(
-        &instance_interceptor->instance_extensions, effective_api_version, pCreateInfo);
+        &instance_interceptor->instance_extensions, &instance_interceptor->device_extensions, effective_api_version, pCreateInfo);
     device_interceptor->device_extensions = device_extensions;
 
     layer_init_device_dispatch_table(*pDevice, &device_interceptor->device_dispatch_table, fpGetDeviceProcAddr);
@@ -11255,3 +11276,4 @@ VK_LAYER_EXPORT VKAPI_ATTR VkResult VKAPI_CALL vkNegotiateLoaderLayerInterfaceVe
 
     return VK_SUCCESS;
 }
+

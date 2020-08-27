@@ -718,17 +718,21 @@ class HelperFileOutputGenerator(OutputGenerator):
                     '            return VK_API_VERSION_1_2;',
                     '    }',
                     '',
+                    '    bool pdev_structs_disallowed = false;',
+                    '',
                     '    uint32_t InitFromInstanceCreateInfo(uint32_t requested_api_version, const VkInstanceCreateInfo *pCreateInfo) {'])
             else:
                 struct.extend([
                     '    %s() = default;' % struct_type,
                     '    %s(const %s& instance_ext) : %s(instance_ext) {}' % (struct_type, instance_struct_type, instance_struct_type),
+                    '    std::unordered_set<std::string> device_extensions_enumerated{};',
                     '',
-                    '    uint32_t InitFromDeviceCreateInfo(const %s *instance_extensions, uint32_t requested_api_version,' % instance_struct_type,
-                    '                                      const VkDeviceCreateInfo *pCreateInfo) {',
+                    '    uint32_t InitFromDeviceCreateInfo(const %s *instance_extensions, const DeviceExtensions *parent_device_extensions, uint32_t requested_api_version,' % instance_struct_type,
+                    '        const VkDeviceCreateInfo *pCreateInfo) {',
                     '        // Initialize: this to defaults,  base class fields to input.',
                     '        assert(instance_extensions);',
                     '        *this = %s(*instance_extensions);' % struct_type,
+                    '        device_extensions_enumerated = parent_device_extensions->device_extensions_enumerated;',
                     '']),
             struct.extend([
                 '',
@@ -768,9 +772,32 @@ class HelperFileOutputGenerator(OutputGenerator):
                 '                auto info = get_info(pCreateInfo->ppEnabledExtensionNames[i]);',
                 '                if (info.state) this->*(info.state) = kEnabledByCreateinfo;',
                 '            }',
+                '        }'])
+            if type == 'Instance':
+                struct.extend([
+                '',
+                '        if (!vk_khr_get_physical_device_properties_2 && (requested_api_version < VK_API_VERSION_1_1)) {',
+                '            pdev_structs_disallowed = true;',
                 '        }',
+                ''])
+            struct.extend([
                 '        return api_version;',
                 '    }',
+                ''])
+            if type == 'Device':
+                struct.extend([
+                '    void SetPdevSupport(std::string ext_name) {',
+                '        device_extensions_enumerated.insert(ext_name);',
+                '    }',
+                '',
+                '    bool SupportedByPdev(std::string ext_name) const {',
+                '        auto enum_iter = device_extensions_enumerated.find(ext_name);',
+                '        if ( enum_iter != device_extensions_enumerated.cend()) {',
+                '            return true;',
+                '        }',
+                '        return false;',
+                '    }'])
+            struct.extend([
                 '};'])
 
             # Output reference lists of instance/device extension names

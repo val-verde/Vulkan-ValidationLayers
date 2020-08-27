@@ -501,7 +501,11 @@ class ParameterValidationOutputGenerator(OutputGenerator):
                         else:
                             print("Error in parameter_validation_generator.py CodeGen.")
                         norm_ext_name = ext_name_define[:-15].lower()
-                        pnext_check += '            if (!%s_extensions.%s) {\n' % (table_type, norm_ext_name.lower())
+                        if table_type == 'device':
+                            pnext_check += '            if ((device_extensions.pdev_structs_disallowed || !device_extensions.SupportedByPdev(%s)) &&\n' % ext_name_define
+                            pnext_check += '                !%s_extensions.%s) {\n' % (table_type, norm_ext_name.lower())
+                        else:
+                            pnext_check += '            if (!%s_extensions.%s) {\n' % (table_type, norm_ext_name.lower())
                         pnext_check += '                skip |= LogError(\n'
                         pnext_check += '                           instance, pnext_vuid,\n'
                         pnext_check += '                           "%%s: Includes a pNext pointer (%%s) to a VkStructureType (%s), but its parent extension "\n' % struct_type
