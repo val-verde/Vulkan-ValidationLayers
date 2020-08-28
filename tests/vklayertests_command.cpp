@@ -7286,3 +7286,74 @@ TEST_F(VkLayerTest, DrawWithoutUpdatePushConstants) {
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
 }
+
+TEST_F(VkLayerTest, BufferMultiPlanarCopy) {
+    TEST_DESCRIPTION("");
+
+    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor, nullptr));
+    if (DeviceExtensionSupported(gpu(), nullptr, VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME)) {
+        m_device_extension_names.push_back(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
+    } else {
+        printf("%s VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME Extension not supported, skipping tests\n", kSkipPrefix);
+        return;
+    }
+    ASSERT_NO_FATAL_FAILURE(InitState());
+
+    m_errorMonitor->ExpectSuccess();
+
+    const auto mVideoWidth = 640;
+    const uint32_t mVideoHeight = 360;
+
+    VkImageObj image(m_device);
+    image.Init(mVideoWidth, mVideoHeight, 1, VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    ASSERT_TRUE(image.initialized());
+
+    const auto cudaBytePitch = 1024;
+
+    const auto alignedVideoWidth = (mVideoWidth + 63) & ~63;    // 64 pixel aligned   = 640
+    const auto alignedVideoHeight = (mVideoHeight + 31) & ~31;  // 32 pixel aligned  = 384
+    const auto alignedVideoHeightY =
+        (alignedVideoHeight + 3) & ~3;  // This should not do anything, since it is already 32 pixel aligned   = 384
+    const auto chromaHeight = ((alignedVideoHeight >> 1) + 3) & ~3;  //   = 192
+
+    const auto bufferSize = cudaBytePitch * (alignedVideoHeightY + chromaHeight);  //   = 589,824
+    const auto bufferChromaOffset = cudaBytePitch * alignedVideoHeightY;           //   = 393,216
+
+    VkBufferObj buffer;
+    VkMemoryPropertyFlags reqs = 0;
+    buffer.init_as_src_and_dst(*m_device, bufferSize, reqs);
+    ASSERT_TRUE(buffer.initialized());
+
+    VkBufferImageCopy regions[2] = {};
+    regions[0].imageSubresource.aspectMask = VK_IMAGE_ASPECT_PLANE_0_BIT;
+    regions[0].imageSubresource.baseArrayLayer = 0;
+    regions[0].imageSubresource.layerCount = 1;
+    regions[0].imageSubresource.mipLevel = 0;
+    regions[0].bufferOffset = 0;
+    regions[0].bufferImageHeight = 360;
+    regions[0].bufferRowLength = 640;
+    regions[0].imageOffset = {0, 0, 0};
+    regions[0].imageExtent = {640, 360, 1};
+    regions[1].imageSubresource.aspectMask = VK_IMAGE_ASPECT_PLANE_1_BIT;
+    regions[1].imageSubresource.baseArrayLayer = 0;
+    regions[1].imageSubresource.layerCount = 1;
+    regions[1].imageSubresource.mipLevel = 0;
+    regions[1].bufferOffset = 393216;
+    regions[1].bufferImageHeight = 360 / 2;
+    regions[1].bufferRowLength = 640;
+    regions[1].imageOffset = {0, 0, 0};
+    regions[1].imageExtent = {640 / 2, 360 / 2, 1};
+
+    m_commandBuffer->begin();
+
+    // [ VUID-vkCmdCopyBufferToImage-pRegions-00171 ] vkCmdCopyBufferToImage(): pRegion[1] exceeds buffer size of 589,824 bytes
+
+    // Triaged:
+    // For buffer of pRegin[1], offset: 393,216, height: 180, length: 640, unit size: 2, so (392,216 + 180*640*2) > 589,824
+    // Even though we don't know what format he uses, it doesn't have unit size 1 of PLANE_1_BIT of 2PLANE format, so it should not a false positive.
+    // A function is related to unit size: GetBufferSizeFromCopyImage
+    vk::CmdCopyBufferToImage(m_commandBuffer->handle(), buffer.handle(), image.handle(), VK_IMAGE_LAYOUT_GENERAL, 2, regions);
+    m_commandBuffer->end();
+
+    m_errorMonitor->VerifyNotFound();
+}
