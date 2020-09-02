@@ -107,7 +107,12 @@ unsigned ExecutionModelToShaderStageFlagBits(unsigned mode);
 
 // SPIRV utility functions
 void SHADER_MODULE_STATE::BuildDefIndex() {
+    function_set func_set = {};
+
     for (auto insn : *this) {
+        // offset is not 0, it means it's updated and the range is in Function.
+        if (func_set.offset) func_set.op_lists.insert({insn.opcode(), insn.offset()});
+
         switch (insn.opcode()) {
             // Types
             case spv::OpTypeVoid:
@@ -162,6 +167,9 @@ void SHADER_MODULE_STATE::BuildDefIndex() {
                 // Functions
             case spv::OpFunction:
                 def_index[insn.word(2)] = insn.offset();
+                func_set.id = insn.word(2);
+                func_set.offset = insn.offset();
+                func_set.op_lists.clear();
                 break;
 
                 // Decorations
@@ -174,6 +182,12 @@ void SHADER_MODULE_STATE::BuildDefIndex() {
                 for (auto i = 2u; i < insn.len(); i++) decorations[insn.word(i)].merge(src);
             } break;
 
+            case spv::OpMemberDecorate: {
+                if (insn.word(3) == spv::DecorationOffset) {
+                    memberDecorate_offset_lists.insert({insn.word(1), insn.word(4)});
+                }
+            } break;
+
                 // Entry points ... add to the entrypoint table
             case spv::OpEntryPoint: {
                 // Entry points do not have an id (the id is the function id) and thus need their own table
@@ -183,7 +197,11 @@ void SHADER_MODULE_STATE::BuildDefIndex() {
                 entry_points.emplace(entrypoint_name, EntryPoint{insn.offset(), entrypoint_stage});
                 break;
             }
-
+            case spv::OpFunctionEnd: {
+                func_set.length = insn.offset() - func_set.offset;
+                function_sets[func_set.id] = func_set;
+                break;
+            }
             default:
                 // We don't care about any other defs for now.
                 break;
@@ -1079,58 +1097,160 @@ std::vector<std::pair<descriptor_slot_t, interface_var>> CollectInterfaceByDescr
     return out;
 }
 
-void SetPushConstantUsedInShader(const SHADER_MODULE_STATE &src, const std::unordered_set<uint32_t> &accessible_ids,
+struct shader_struct_member {
+    uint32_t offset;
+    uint32_t size;                                     // A scalar size or a struct size. Not consider array
+    std::vector<uint32_t> array_length_hierarchy;      // e.g.: multi-dimensional array, mat, vec. mat is combined with 2 vec.
+    std::vector<shader_struct_member> struct_members;  // If the data is not a struct, it's empty.
+
+    shader_struct_member() : offset(0), size(0) {}
+};
+
+int GetConstantIntValue(const SHADER_MODULE_STATE &src, uint32_t id) {
+    const auto it = src.get_def(id);
+    assert(it != src.end());
+    return it.word(3);
+}
+
+void DefineStructMember(const SHADER_MODULE_STATE &src, spirv_inst_iter &member_it, shader_struct_member &data) {
+    const auto struct_it = GetStructType(&src, member_it, false);
+    assert(struct_it != src.end());
+    data.size = 0;
+    auto range = src.memberDecorate_offset_lists.equal_range(struct_it.word(1));
+
+    shader_struct_member data1;
+    uint32_t i = 2;
+    uint32_t local_offset = 0;
+    for (auto it = range.first; it != range.second; ++it) {
+        local_offset = it->second;
+        data1 = {};
+        data1.offset = data.offset + local_offset; // data offset is world offset.
+        auto def_member = src.get_def(struct_it.word(i));
+
+        // Array could be multi-dimensional
+        while (def_member.opcode() == spv::OpTypeArray) {
+            const auto len_id = def_member.word(3);
+            const auto def_len = src.get_def(len_id);
+            data1.array_length_hierarchy.emplace_back(def_len.word(3));  // array length
+            def_member = src.get_def(def_member.word(2));
+        }
+
+        if (def_member.opcode() == spv::OpTypeStruct || def_member.opcode() == spv::OpTypePointer) {
+            // If it's OpTypePointer. it means the member is a buffer, the type will be TypePointer, and then struct
+            DefineStructMember(src, def_member, data1);
+        } else {
+            if (def_member.opcode() == spv::OpTypeMatrix) {
+                data1.array_length_hierarchy.emplace_back(def_member.word(3));  // matrix's columns. matrix's row is vector.
+                def_member = src.get_def(def_member.word(2));
+            }
+
+            if (def_member.opcode() == spv::OpTypeVector) {
+                data1.array_length_hierarchy.emplace_back(def_member.word(3));  // vector length
+                def_member = src.get_def(def_member.word(2));
+            }
+
+            // Get scalar type size. The value in SPRV-R is bit. It needs to translate to byte.
+            data1.size = (def_member.word(2) / 8);
+        }
+        data.struct_members.emplace_back(data1);
+        ++i;
+    }
+    uint32_t total_array_length = 1;
+    for (const auto length : data1.array_length_hierarchy) {
+        total_array_length *= length;
+    }
+    data.size = local_offset + data1.size * total_array_length;
+}
+
+// called_function_id: A function might run recursive. But it's hard to check "if-else" to skip function,
+//                     so record functions that have been ran and don't run again.
+void SetUsedStructMember(const SHADER_MODULE_STATE &src, spirv_inst_iter &member_it, const function_set &func_set,
+                         shader_struct_member &data, std::set<uint32_t> &called_function_id,
+                         std::vector<uint8_t> &push_constant_used_in_shader) {
+    called_function_id.insert(func_set.id);
+
+    auto range = func_set.op_lists.equal_range(spv::OpAccessChain);
+    for (auto it = range.first; it != range.second; ++it) {
+        const auto access_chain = src.at(it->second);
+        if (access_chain.word(3) == member_it.word(2)) {
+            auto *data1 = &data;
+            uint32_t strcut_member_index = 0;
+            size_t array_length_hierarchy_len = 0;
+            std::vector<uint32_t> array_index_list;
+            const auto access_chain_len = access_chain.len();
+
+            for (uint32_t i = 4; i < access_chain_len; ++i) {
+                // Get index of member in struct
+                strcut_member_index = GetConstantIntValue(src, access_chain.word(i));
+                data1 = &(data1->struct_members[strcut_member_index]);
+
+                // if the member is a array, vec, mat, the index is behind member index
+                array_index_list.clear();
+                array_length_hierarchy_len = data1->array_length_hierarchy.size();
+                for (uint32_t i2 = 0; i2 < array_length_hierarchy_len && (i + 1) < access_chain.len(); ++i2) {
+                    ++i;
+                    const auto array_index = GetConstantIntValue(src, access_chain.word(i));
+                    array_index_list.emplace_back(array_index);
+                }
+            }
+
+            // Set used location
+            uint32_t array_offset = 0;
+            uint32_t array_block = 1;
+            const auto array_index_list_len = array_index_list.size();
+            for (int i = static_cast<int>(array_length_hierarchy_len - 1); i >= 0; --i) {
+                if (i < array_index_list_len && array_index_list[i] > 0) {
+                    array_offset += (array_block * array_index_list[i]);
+                }
+                array_block *= data1->array_length_hierarchy[i];
+            }
+
+            array_offset *= data1->size;
+            array_offset += data1->offset;
+
+            uint32_t block_memory_size = data1->size;
+            for (size_t i = array_index_list_len; i < array_length_hierarchy_len; ++i) {
+                block_memory_size *= data1->array_length_hierarchy[i];
+            }
+
+            uint32_t end = array_offset + block_memory_size;
+            if (push_constant_used_in_shader.size() < end) {
+                push_constant_used_in_shader.resize(end, 0);
+            }
+            std::memset(push_constant_used_in_shader.data() + array_offset, 1, static_cast<std::size_t>(block_memory_size));
+        }
+    }
+
+    range = func_set.op_lists.equal_range(spv::OpFunctionCall);
+    for (auto it = range.first; it != range.second; ++it) {
+        const auto function_call = src.at(it->second);
+        const auto function_id = function_call.word(3);
+
+        if (called_function_id.find(function_id) == called_function_id.end()) {
+            auto it2 = src.function_sets.find(function_id);
+            if (it2 != src.function_sets.end()) {
+                SetUsedStructMember(src, member_it, it2->second, data, called_function_id, push_constant_used_in_shader);
+            }
+        }
+    }
+}
+
+void SetPushConstantUsedInShader(const SHADER_MODULE_STATE &src, const spirv_inst_iter &entrypoint,
+                                 const std::unordered_set<uint32_t> &accessible_ids,
                                  std::vector<uint8_t> &push_constant_used_in_shader) {
+    const auto entrypoint_function = src.function_sets.find(entrypoint.word(2));  // 2: function id
+    assert(entrypoint_function != src.function_sets.end());
+
     for (auto id : accessible_ids) {
         auto def_insn = src.get_def(id);
         if (def_insn.opcode() == spv::OpVariable && def_insn.word(3) == spv::StorageClassPushConstant) {
             spirv_inst_iter type = src.get_def(def_insn.word(1));
-            type = GetStructType(&src, type, false);
-            assert(type != src.end());
 
-            std::vector<uint32_t> struct_member;
-            for (uint32_t i = 2; i < type.len(); ++i) {
-                struct_member.emplace_back(type.word(i));
-            }
-            uint32_t struct_member_index = 0;
-
-            for (auto insn : src) {
-                if (insn.opcode() == spv::OpMemberDecorate && insn.word(1) == type.word(1)) {
-                    if (insn.word(3) == spv::DecorationOffset) {
-                        auto def_member = src.get_def(struct_member[struct_member_index]);
-                        auto size = 1;
-
-                        if (def_member.opcode() == spv::OpTypeArray) {
-                            const auto len_id = def_member.word(3);
-                            const auto def_len = src.get_def(len_id);
-                            size *= def_len.word(3);  // array length
-                            def_member = src.get_def(def_member.word(2));
-                        }
-
-                        if (def_member.opcode() == spv::OpTypeMatrix) {
-                            size *= def_member.word(3);  // matrix's columns. matrix's row is vector.
-                            def_member = src.get_def(def_member.word(2));
-                        }
-
-                        if (def_member.opcode() == spv::OpTypeVector) {
-                            size *= def_member.word(3);  // vector length
-                            def_member = src.get_def(def_member.word(2));
-                        }
-
-                        // Get scalar type size. The value in SPRV-R is bit. It needs to translate to byte.
-                        size *= (def_member.word(2) / 8);
-
-                        auto const offset = insn.word(4);
-                        auto const end = offset + size;
-
-                        if (push_constant_used_in_shader.size() < end) {
-                            push_constant_used_in_shader.resize(end, 0);
-                        }
-                        std::memset(push_constant_used_in_shader.data() + offset, 1, static_cast<std::size_t>(size));
-                        ++struct_member_index;
-                    }
-                }
-            }
+            shader_struct_member struct_member;
+            DefineStructMember(src, type, struct_member);
+            std::set<uint32_t> called_function_id;
+            SetUsedStructMember(src, def_insn, entrypoint_function->second, struct_member, called_function_id,
+                                push_constant_used_in_shader);
         }
     }
 }
@@ -1534,88 +1654,6 @@ std::unordered_set<uint32_t> MarkAccessibleIds(SHADER_MODULE_STATE const *src, s
     }
 
     return ids;
-}
-
-bool CoreChecks::ValidatePushConstantBlockAgainstPipeline(std::vector<VkPushConstantRange> const *push_constant_ranges,
-                                                          SHADER_MODULE_STATE const *src, spirv_inst_iter type,
-                                                          VkShaderStageFlagBits stage) const {
-    bool skip = false;
-
-    // Strip off ptrs etc
-    type = GetStructType(src, type, false);
-    assert(type != src->end());
-
-    std::vector<uint32_t> struct_member;
-    for (uint32_t i = 2; i < type.len(); ++i) {
-        struct_member.emplace_back(type.word(i));
-    }
-    uint32_t struct_member_index = 0;
-    // Validate directly off the offsets. this isn't quite correct for arrays and matrices, but is a good first step.
-    // TODO: weird sizes
-    for (auto insn : *src) {
-        if (insn.opcode() == spv::OpMemberDecorate && insn.word(1) == type.word(1)) {
-            if (insn.word(3) == spv::DecorationOffset) {
-                auto def_member = src->get_def(struct_member[struct_member_index]);
-                auto size = 1;
-
-                if (def_member.opcode() == spv::OpTypeArray) {
-                    const auto len_id = def_member.word(3);
-                    const auto def_len = src->get_def(len_id);
-                    size *= def_len.word(3);  // array length
-                    def_member = src->get_def(def_member.word(2));
-                }
-
-                if (def_member.opcode() == spv::OpTypeMatrix) {
-                    size *= def_member.word(3);  // matrix's columns. matrix's row is vector.
-                    def_member = src->get_def(def_member.word(2));
-                }
-
-                if (def_member.opcode() == spv::OpTypeVector) {
-                    size *= def_member.word(3);  // vector length
-                }
-
-                // Get scalar type size. The value in SPRV-R is bit. It needs to translate to byte.
-                size *= (def_member.word(2) / 8);
-
-                auto const member = insn.word(2);
-                auto const offset = insn.word(4);
-
-                bool found_range = false;
-                for (auto const &range : *push_constant_ranges) {
-                    if ((range.offset <= offset) && ((range.offset + range.size) >= (offset + size)) &&
-                        (range.stageFlags & stage)) {
-                        found_range = true;
-
-                        break;
-                    }
-                }
-                ++struct_member_index;
-
-                if (!found_range) {
-                    skip |= LogError(device, kVUID_Core_Shader_PushConstantOutOfRange,
-                                     "Shader push-constant buffer member %u at offset %u is not declared in pipeline layout",
-                                     member, offset);
-                }
-            }
-        }
-    }
-
-    return skip;
-}
-
-bool CoreChecks::ValidatePushConstantUsage(std::vector<VkPushConstantRange> const *push_constant_ranges,
-                                           SHADER_MODULE_STATE const *src, std::unordered_set<uint32_t> accessible_ids,
-                                           VkShaderStageFlagBits stage) const {
-    bool skip = false;
-
-    for (auto id : accessible_ids) {
-        auto def_insn = src->get_def(id);
-        if (def_insn.opcode() == spv::OpVariable && def_insn.word(3) == spv::StorageClassPushConstant) {
-            skip |= ValidatePushConstantBlockAgainstPipeline(push_constant_ranges, src, src->get_def(def_insn.word(1)), stage);
-        }
-    }
-
-    return skip;
 }
 
 // Validate that data for each specialization entry is fully contained within the buffer.
@@ -3302,7 +3340,9 @@ bool CoreChecks::ValidatePipelineShaderStage(VkPipelineShaderStageCreateInfo con
     skip |= ValidateShaderStageGroupNonUniform(module, pStage->stage);
     skip |= ValidateExecutionModes(module, entrypoint);
     skip |= ValidateSpecializationOffsets(pStage);
-    skip |= ValidatePushConstantUsage(pipeline->pipeline_layout->push_constant_ranges.get(), module, accessible_ids, pStage->stage);
+
+    // Validate push constant in CmdDraw, not in Create*Pipeline.
+
     if (check_point_size && !pipeline->graphicsPipelineCI.pRasterizationState->rasterizerDiscardEnable) {
         skip |= ValidatePointListShaderState(pipeline, module, entrypoint, pStage->stage);
     }

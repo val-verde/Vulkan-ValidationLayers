@@ -1028,9 +1028,9 @@ bool CoreChecks::ValidateCmdBufDrawState(const CMD_BUFFER_STATE *cb_node, CMD_TY
     if (nullptr == pPipe) {
         return LogError(cb_node->commandBuffer, vuid.pipeline_bound,
                         "Must not call %s on this command buffer while there is no %s pipeline bound.", function,
-                        bind_point == VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR
-                            ? "RayTracing"
-                            : bind_point == VK_PIPELINE_BIND_POINT_GRAPHICS ? "Graphics" : "Compute");
+                        bind_point == VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR ? "RayTracing"
+                        : bind_point == VK_PIPELINE_BIND_POINT_GRAPHICS      ? "Graphics"
+                                                                             : "Compute");
     }
 
     bool result = false;
@@ -1188,13 +1188,25 @@ bool CoreChecks::ValidateCmdBufDrawState(const CMD_BUFFER_STATE *cb_node, CMD_TY
         } else {
             uint32_t index = 0;
             for (const auto &used : pPipe->push_constant_used_in_shader) {
-                if (used == 1 && cb_node->push_constant_data_set[index] == 0) {
-                    LogObjectList objlist(cb_node->commandBuffer);
-                    objlist.add(pipeline_layout->layout);
-                    result |= LogError(objlist, vuid.push_constants_set,
-                                       "Not every byte in the push constant ranges of %s have been set.",
-                                       report_data->FormatHandle(pipeline_layout->layout).c_str());
-                    break;
+                if (used == 1) {
+                    if (index >= cb_node->push_constant_data_set.size()) {
+                        LogObjectList objlist(cb_node->commandBuffer);
+                        objlist.add(pPipe->pipeline);
+                        objlist.add(pipeline_layout->layout);
+                        result |= LogError(objlist, vuid.push_constants_set,
+                                           "Push constant ranges of shader in %s is out of bounds of %s.",
+                                           report_data->FormatHandle(pPipe->pipeline).c_str(),
+                                           report_data->FormatHandle(pipeline_layout->layout).c_str());
+                        break;
+                    }
+                    if (cb_node->push_constant_data_set[index] == 0) {
+                        LogObjectList objlist(cb_node->commandBuffer);
+                        objlist.add(pipeline_layout->layout);
+                        result |= LogError(objlist, vuid.push_constants_set,
+                                           "Not every byte in the push constant ranges of %s have been set.",
+                                           report_data->FormatHandle(pipeline_layout->layout).c_str());
+                        break;
+                    }
                 }
                 ++index;
             }
@@ -8044,11 +8056,11 @@ bool CoreChecks::PreCallValidateCmdPushConstants(VkCommandBuffer commandBuffer, 
         }
         if (found_stages != stageFlags) {
             uint32_t missing_stages = ~found_stages & stageFlags;
-            skip |= LogError(commandBuffer, "VUID-vkCmdPushConstants-offset-01795",
-                             "vkCmdPushConstants(): stageFlags = 0x%" PRIx32
-                             ", VkPushConstantRange in %s overlapping offset = %d and size = %d, do not contain %s.",
-                             (uint32_t)stageFlags, report_data->FormatHandle(layout).c_str(), offset, size,
-                             string_VkShaderStageFlags(missing_stages).c_str());
+            skip |= LogError(
+                commandBuffer, "VUID-vkCmdPushConstants-offset-01795",
+                "vkCmdPushConstants(): %s, VkPushConstantRange in %s overlapping offset = %d and size = %d, do not contain %s.",
+                string_VkShaderStageFlags(stageFlags).c_str(), report_data->FormatHandle(layout).c_str(), offset, size,
+                string_VkShaderStageFlags(missing_stages).c_str());
         }
     }
     return skip;
