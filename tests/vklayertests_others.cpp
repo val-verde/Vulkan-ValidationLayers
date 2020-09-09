@@ -8178,6 +8178,7 @@ TEST_F(VkLayerTest, QueryPerformanceIncompletePasses) {
 
         // Invalid stride
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetQueryPoolResults-queryType-03229");
+        m_errorMonitor->SetUnexpectedError("VUID-vkGetQueryPoolResults-dataSize-00817");
         vk::GetQueryPoolResults(device(), query_pool, 0, 1, sizeof(VkPerformanceCounterResultKHR) * results.size(), &results[0],
                                 sizeof(VkPerformanceCounterResultKHR) + 4, VK_QUERY_RESULT_WAIT_BIT);
         m_errorMonitor->VerifyFound();
