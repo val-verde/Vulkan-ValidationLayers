@@ -25,6 +25,9 @@
 
 #pragma once
 
+#include <iostream>
+#include <fstream>
+
 #include "state_tracker.h"
 #include "image_layout_map.h"
 #include "gpu_validation.h"
@@ -1317,4 +1320,57 @@ struct LayoutUseCheckAndMessage {
         }
         return layout == kInvalidLayout;
     }
+};
+
+class TickCountClass : public CoreChecks {
+  public:
+    bool PreCallValidateCreateShaderModule(VkDevice device, const VkShaderModuleCreateInfo* pCreateInfo,
+                                           const VkAllocationCallbacks* pAllocator, VkShaderModule* pShaderModule,
+                                           void* csm_state) const;
+    void PreCallRecordCreateShaderModule(VkDevice device, const VkShaderModuleCreateInfo* pCreateInfo,
+                                         const VkAllocationCallbacks* pAllocator, VkShaderModule* pShaderModule, void* csm_state);
+    void PostCallRecordCreateShaderModule(VkDevice device, const VkShaderModuleCreateInfo* pCreateInfo,
+                                          const VkAllocationCallbacks* pAllocator, VkShaderModule* pShaderModule, VkResult result,
+                                          void* csm_state);
+
+    bool PreCallValidateCmdDraw(VkCommandBuffer commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
+                                uint32_t firstInstance) const;
+    void PreCallRecordCmdDraw(VkCommandBuffer commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
+                              uint32_t firstInstance);
+    void PostCallRecordCmdDraw(VkCommandBuffer commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
+                               uint32_t firstInstance);
+    bool PreCallValidateCmdDrawIndexed(VkCommandBuffer commandBuffer, uint32_t indexCount, uint32_t instanceCount,
+                                       uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) const;
+    void PreCallRecordCmdDrawIndexed(VkCommandBuffer commandBuffer, uint32_t indexCount, uint32_t instanceCount,
+                                     uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance);
+    void PostCallRecordCmdDrawIndexed(VkCommandBuffer commandBuffer, uint32_t indexCount, uint32_t instanceCount,
+                                      uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance);
+    bool PreCallValidateCmdDrawIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset, uint32_t drawCount,
+                                        uint32_t stride) const;
+    void PreCallRecordCmdDrawIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset, uint32_t drawCount,
+                                      uint32_t stride);
+    void PostCallRecordCmdDrawIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset, uint32_t drawCount,
+                                       uint32_t stride);
+    bool PreCallValidateCmdDrawIndexedIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
+                                               uint32_t drawCount, uint32_t stride) const;
+    void PreCallRecordCmdDrawIndexedIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
+                                             uint32_t drawCount, uint32_t stride);
+    void PostCallRecordCmdDrawIndexedIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
+                                              uint32_t drawCount, uint32_t stride);
+
+    bool PreCallValidateUpdateDescriptorSets(VkDevice device, uint32_t descriptorWriteCount,
+                                             const VkWriteDescriptorSet* pDescriptorWrites, uint32_t descriptorCopyCount,
+                                             const VkCopyDescriptorSet* pDescriptorCopies) const;
+    void PreCallRecordUpdateDescriptorSets(VkDevice device, uint32_t descriptorWriteCount,
+                                           const VkWriteDescriptorSet* pDescriptorWrites, uint32_t descriptorCopyCount,
+                                           const VkCopyDescriptorSet* pDescriptorCopies);
+    void PostCallRecordUpdateDescriptorSets(VkDevice device, uint32_t descriptorWriteCount,
+                                            const VkWriteDescriptorSet* pDescriptorWrites, uint32_t descriptorCopyCount,
+                                            const VkCopyDescriptorSet* pDescriptorCopies);
+    bool PreCallValidateCreateRenderPass(VkDevice device, const VkRenderPassCreateInfo* pCreateInfo,
+                                         const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass) const;
+    void PreCallRecordCreateRenderPass(VkDevice device, const VkRenderPassCreateInfo* pCreateInfo,
+                                       const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass);
+    void PostCallRecordCreateRenderPass(VkDevice device, const VkRenderPassCreateInfo* pCreateInfo,
+                                        const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass, VkResult result);
 };

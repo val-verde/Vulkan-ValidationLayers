@@ -32,6 +32,8 @@
 #include "layer_options.h"
 #include "layer_chassis_dispatch.h"
 
+
+
 small_unordered_map<void*, ValidationObject*, 2> layer_data_map;
 
 // Global unique object identifier.
@@ -57,6 +59,8 @@ bool wrap_handles = true;
 
 // Global list of sType,size identifiers
 std::vector<std::pair<uint32_t, uint32_t>> custom_stype_info{};
+
+std::ofstream TimingDataFile;
 
 namespace vulkan_layer_chassis {
 
@@ -252,6 +256,13 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo *pCreat
     PFN_vkGetInstanceProcAddr fpGetInstanceProcAddr = chain_info->u.pLayerInfo->pfnNextGetInstanceProcAddr;
     PFN_vkCreateInstance fpCreateInstance = (PFN_vkCreateInstance)fpGetInstanceProcAddr(NULL, "vkCreateInstance");
     if (fpCreateInstance == NULL) return VK_ERROR_INITIALIZATION_FAILED;
+
+    // Inserted for testing
+    if (!TimingDataFile.is_open()) {
+        TimingDataFile.open("KhronosLayerTimingData.txt", std::ofstream::binary | std::ofstream::app);
+    }
+    assert(TimingDataFile);
+
     chain_info->u.pLayerInfo = chain_info->u.pLayerInfo->pNext;
     uint32_t specified_version = (pCreateInfo->pApplicationInfo ? pCreateInfo->pApplicationInfo->apiVersion : VK_API_VERSION_1_0);
     uint32_t api_version;
@@ -286,7 +297,8 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo *pCreat
     auto object_tracker_obj = new ObjectLifetimes;
     object_tracker_obj->RegisterValidationObject(!local_disables[object_tracking], api_version, report_data, local_object_dispatch);
 
-    auto core_checks_obj = new CoreChecks;
+    //auto core_checks_obj = new CoreChecks;
+    auto core_checks_obj = new TickCountClass;
     core_checks_obj->RegisterValidationObject(!local_disables[core_checks], api_version, report_data, local_object_dispatch);
 
     auto best_practices_obj = new BestPractices;
@@ -400,6 +412,9 @@ VKAPI_ATTR void VKAPI_CALL DestroyInstance(VkInstance instance, const VkAllocati
         delete *item;
     }
     FreeLayerDataPtr(key, layer_data_map);
+
+    TimingDataFile.close();
+
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL CreateDevice(VkPhysicalDevice gpu, const VkDeviceCreateInfo *pCreateInfo,
@@ -476,7 +491,9 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateDevice(VkPhysicalDevice gpu, const VkDevice
     auto object_tracker_obj = new ObjectLifetimes;
     object_tracker_obj->InitDeviceValidationObject(!disables[object_tracking], instance_interceptor, device_interceptor);
 
-    auto core_checks_obj = new CoreChecks;
+    //auto core_checks_obj = new CoreChecks;
+    auto core_checks_obj = new TickCountClass;
+
     core_checks_obj->InitDeviceValidationObject(!disables[core_checks], instance_interceptor, device_interceptor);
 
     auto best_practices_obj = new BestPractices;

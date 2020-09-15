@@ -13290,3 +13290,175 @@ template void PIPELINE_STATE::initRayTracingPipeline(const ValidationStateTracke
                                                      const VkRayTracingPipelineCreateInfoNV *pCreateInfo);
 template void PIPELINE_STATE::initRayTracingPipeline(const ValidationStateTracker *state_data,
                                                      const VkRayTracingPipelineCreateInfoKHR *pCreateInfo);
+
+// LUGMAL
+// Test of timer wrapper functions
+// ********************************************************************************************************************************
+// ********************************************************************************************************************************
+// ********************************************************************************************************************************
+
+extern std::ofstream TimingDataFile;
+
+static inline int64_t StartCounting() {
+    LARGE_INTEGER payload;
+    QueryPerformanceCounter(&payload);
+    return payload.QuadPart;
+}
+
+static inline void StopCounting(const char *api_name, int64_t start_time) {
+    LARGE_INTEGER payload;
+    QueryPerformanceCounter(&payload);
+    auto diff = payload.QuadPart - start_time;
+    if (diff > 2) {
+        std::stringstream out_string;
+        out_string << start_time << ": " << api_name << ": " << diff << std::endl;
+        TimingDataFile << out_string.str();
+    }
+}
+
+bool TickCountClass::PreCallValidateCreateShaderModule(VkDevice device, const VkShaderModuleCreateInfo *pCreateInfo,
+                                                       const VkAllocationCallbacks *pAllocator, VkShaderModule *pShaderModule,
+                                                       void *csm_state) const {
+    auto start = StartCounting();
+    auto result = CoreChecks::PreCallValidateCreateShaderModule(device, pCreateInfo, pAllocator, pShaderModule);
+    StopCounting("PreCallValidateCreateShaderModule", start);
+    return result;
+}
+void TickCountClass::PreCallRecordCreateShaderModule(VkDevice device, const VkShaderModuleCreateInfo *pCreateInfo,
+                                                     const VkAllocationCallbacks *pAllocator, VkShaderModule *pShaderModule,
+                                                     void *csm_state) {
+    auto start = StartCounting();
+    CoreChecks::PreCallRecordCreateShaderModule(device, pCreateInfo, pAllocator, pShaderModule, csm_state);
+    StopCounting("PreCallRecordCreateShaderModule", start);
+}
+void TickCountClass::PostCallRecordCreateShaderModule(VkDevice device, const VkShaderModuleCreateInfo *pCreateInfo,
+                                                      const VkAllocationCallbacks *pAllocator, VkShaderModule *pShaderModule,
+                                                      VkResult result, void *csm_state) {
+    auto start = StartCounting();
+    CoreChecks::PostCallRecordCreateShaderModule(device, pCreateInfo, pAllocator, pShaderModule, result, csm_state);
+    StopCounting("PostCallRecordCreateShaderModule", start);
+}
+bool TickCountClass::PreCallValidateCmdDraw(VkCommandBuffer commandBuffer, uint32_t vertexCount, uint32_t instanceCount,
+                                            uint32_t firstVertex, uint32_t firstInstance) const {
+    auto start = StartCounting();
+    auto result = CoreChecks::PreCallValidateCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
+    StopCounting("PreCallValidateCmdDraw", start);
+    return result;
+}
+void TickCountClass::PreCallRecordCmdDraw(VkCommandBuffer commandBuffer, uint32_t vertexCount, uint32_t instanceCount,
+                                          uint32_t firstVertex, uint32_t firstInstance) {
+    auto start = StartCounting();
+    CoreChecks::PreCallRecordCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
+    StopCounting("PreCallRecordCmdDraw", start);
+}
+void TickCountClass::PostCallRecordCmdDraw(VkCommandBuffer commandBuffer, uint32_t vertexCount, uint32_t instanceCount,
+                                           uint32_t firstVertex, uint32_t firstInstance) {
+    auto start = StartCounting();
+    CoreChecks::PostCallRecordCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
+    StopCounting("PostCallRecordCmdDraw", start);
+}
+bool TickCountClass::PreCallValidateCmdDrawIndexed(VkCommandBuffer commandBuffer, uint32_t indexCount, uint32_t instanceCount,
+                                                   uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) const {
+    auto start = StartCounting();
+    auto result = CoreChecks::PreCallValidateCmdDrawIndexed(commandBuffer, indexCount, instanceCount, firstIndex, vertexOffset,
+                                                            firstInstance);
+    StopCounting("PreCallValidateCmdDrawIndexed", start);
+    return result;
+}
+void TickCountClass::PreCallRecordCmdDrawIndexed(VkCommandBuffer commandBuffer, uint32_t indexCount, uint32_t instanceCount,
+                                                 uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) {
+    auto start = StartCounting();
+    CoreChecks::PreCallRecordCmdDrawIndexed(commandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+    StopCounting("PreCallRecordCmdDrawIndexed", start);
+}
+void TickCountClass::PostCallRecordCmdDrawIndexed(VkCommandBuffer commandBuffer, uint32_t indexCount, uint32_t instanceCount,
+                                                  uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) {
+    auto start = StartCounting();
+    CoreChecks::PostCallRecordCmdDrawIndexed(commandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+    StopCounting("PostCallRecordCmdDrawIndexed", start);
+}
+bool TickCountClass::PreCallValidateCmdDrawIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
+                                                    uint32_t drawCount, uint32_t stride) const {
+    auto start = StartCounting();
+    auto result = CoreChecks::PreCallValidateCmdDrawIndirect(commandBuffer, buffer, offset, drawCount, stride);
+    StopCounting("PreCallValidateCmdDrawIndirect", start);
+    return result;
+}
+void TickCountClass::PreCallRecordCmdDrawIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
+                                                  uint32_t drawCount, uint32_t stride) {
+    auto start = StartCounting();
+    CoreChecks::PreCallRecordCmdDrawIndirect(commandBuffer, buffer, offset, drawCount, stride);
+    StopCounting("PreCallRecordCmdDrawIndirect", start);
+}
+void TickCountClass::PostCallRecordCmdDrawIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
+                                                   uint32_t drawCount, uint32_t stride) {
+    auto start = StartCounting();
+    CoreChecks::PostCallRecordCmdDrawIndirect(commandBuffer, buffer, offset, drawCount, stride);
+    StopCounting("PostCallRecordCmdDrawIndirect", start);
+}
+bool TickCountClass::PreCallValidateCmdDrawIndexedIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
+                                                           uint32_t drawCount, uint32_t stride) const {
+    auto start = StartCounting();
+    auto result = CoreChecks::PreCallValidateCmdDrawIndexedIndirect(commandBuffer, buffer, offset, drawCount, stride);
+    StopCounting("PreCallValidateCmdDrawIndexedIndirect", start);
+    return result;
+}
+void TickCountClass::PreCallRecordCmdDrawIndexedIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
+                                                         uint32_t drawCount, uint32_t stride) {
+    auto start = StartCounting();
+    CoreChecks::PreCallRecordCmdDrawIndexedIndirect(commandBuffer, buffer, offset, drawCount, stride);
+    StopCounting("PreCallRecordCmdDrawIndexedIndirect", start);
+}
+void TickCountClass::PostCallRecordCmdDrawIndexedIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
+                                                          uint32_t drawCount, uint32_t stride) {
+    auto start = StartCounting();
+    CoreChecks::PostCallRecordCmdDrawIndexedIndirect(commandBuffer, buffer, offset, drawCount, stride);
+    StopCounting("PostCallRecordCmdDrawIndexedIndirect", start);
+}
+bool TickCountClass::PreCallValidateUpdateDescriptorSets(VkDevice device, uint32_t descriptorWriteCount,
+                                                         const VkWriteDescriptorSet *pDescriptorWrites,
+                                                         uint32_t descriptorCopyCount,
+                                                         const VkCopyDescriptorSet *pDescriptorCopies) const {
+    auto start = StartCounting();
+    auto result = CoreChecks::PreCallValidateUpdateDescriptorSets(device, descriptorWriteCount, pDescriptorWrites,
+                                                                  descriptorCopyCount, pDescriptorCopies);
+    StopCounting("PreCallValidateUpdateDescriptorSets", start);
+    return result;
+}
+void TickCountClass::PreCallRecordUpdateDescriptorSets(VkDevice device, uint32_t descriptorWriteCount,
+                                                       const VkWriteDescriptorSet *pDescriptorWrites, uint32_t descriptorCopyCount,
+                                                       const VkCopyDescriptorSet *pDescriptorCopies) {
+    auto start = StartCounting();
+    CoreChecks::PreCallRecordUpdateDescriptorSets(device, descriptorWriteCount, pDescriptorWrites, descriptorCopyCount,
+                                                  pDescriptorCopies);
+    StopCounting("PreCallRecordUpdateDescriptorSets", start);
+}
+void TickCountClass::PostCallRecordUpdateDescriptorSets(VkDevice device, uint32_t descriptorWriteCount,
+                                                        const VkWriteDescriptorSet *pDescriptorWrites, uint32_t descriptorCopyCount,
+                                                        const VkCopyDescriptorSet *pDescriptorCopies) {
+    auto start = StartCounting();
+    CoreChecks::PostCallRecordUpdateDescriptorSets(device, descriptorWriteCount, pDescriptorWrites, descriptorCopyCount,
+                                                   pDescriptorCopies);
+    StopCounting("PostCallRecordUpdateDescriptorSets", start);
+}
+
+bool TickCountClass::PreCallValidateCreateRenderPass(VkDevice device, const VkRenderPassCreateInfo *pCreateInfo,
+                                                     const VkAllocationCallbacks *pAllocator, VkRenderPass *pRenderPass) const {
+    auto start = StartCounting();
+    auto result = CoreChecks::PreCallValidateCreateRenderPass(device, pCreateInfo, pAllocator, pRenderPass);
+    StopCounting("PreCallValidateCreateRenderPass", start);
+    return result;
+};
+void TickCountClass::PreCallRecordCreateRenderPass(VkDevice device, const VkRenderPassCreateInfo *pCreateInfo,
+                                                   const VkAllocationCallbacks *pAllocator, VkRenderPass *pRenderPass) {
+    auto start = StartCounting();
+    CoreChecks::PreCallValidateCreateRenderPass(device, pCreateInfo, pAllocator, pRenderPass);
+    StopCounting("PreCallValidateCreateRenderPass", start);
+};
+void TickCountClass::PostCallRecordCreateRenderPass(VkDevice device, const VkRenderPassCreateInfo *pCreateInfo,
+                                                    const VkAllocationCallbacks *pAllocator, VkRenderPass *pRenderPass,
+                                                    VkResult result) {
+    auto start = StartCounting();
+    CoreChecks::PostCallRecordCreateRenderPass(device, pCreateInfo, pAllocator, pRenderPass, result);
+    StopCounting("PostCallRecordCreateRenderPass", start);
+};
