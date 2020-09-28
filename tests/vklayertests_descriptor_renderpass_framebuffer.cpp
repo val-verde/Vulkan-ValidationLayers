@@ -8327,3 +8327,53 @@ TEST_F(VkLayerTest, ImageSubresourceOverlapBetweenAttachmentsAndDescriptorSets) 
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
 }
+
+TEST_F(VkLayerTest, BufferOutOfBoundWithDisableRobustBufferAccess) {
+    TEST_DESCRIPTION("Validate if robustBufferAccess is disable, the out of bound of buffer is invalid.");
+
+    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    m_errorMonitor->ExpectSuccess();
+    VkPhysicalDeviceFeatures features = {};
+    features.robustBufferAccess = VK_FALSE;
+    ASSERT_NO_FATAL_FAILURE(InitState(&features));
+    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+
+    VkBufferObj buffer;
+    buffer.init(*m_device, 64, 0,
+                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT |
+                    VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT);
+
+    auto view_ci = vk_testing::BufferView::createInfo(buffer.handle(), VK_FORMAT_R8_UNORM);
+    vk_testing::BufferView view;
+    view.init(*m_device, view_ci);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.InitInfo();
+    pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL_GRAPHICS, nullptr},
+                          {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL_GRAPHICS, nullptr},
+                          {2, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1, VK_SHADER_STAGE_ALL_GRAPHICS, nullptr},
+                          {3, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1, VK_SHADER_STAGE_ALL_GRAPHICS, nullptr}};
+    pipe.InitState();
+    pipe.CreateGraphicsPipeline();
+
+    pipe.descriptor_set_->WriteDescriptorBufferInfo(0, buffer.handle(), 64, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    pipe.descriptor_set_->WriteDescriptorBufferInfo(1, buffer.handle(), 64, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    pipe.descriptor_set_->WriteDescriptorBufferView(2, view.handle(), VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER);
+    pipe.descriptor_set_->WriteDescriptorBufferView(3, view.handle(), VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER);
+    pipe.descriptor_set_->UpdateDescriptorSets();
+
+    m_commandBuffer->begin();
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_.handle(), 0, 1,
+                              &pipe.descriptor_set_->set_, 0, nullptr);
+    m_commandBuffer->EndRenderPass();
+    m_commandBuffer->end();
+
+    VkSubmitInfo submit_info = {};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &m_commandBuffer->handle();
+    vk::QueueSubmit(m_device->m_queue, 1, &submit_info, VK_NULL_HANDLE);
+    m_errorMonitor->VerifyNotFound();
+}

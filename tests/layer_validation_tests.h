@@ -392,7 +392,7 @@ struct OneOffDescriptorSet {
     void Clear();
     void WriteDescriptorBufferInfo(int binding, VkBuffer buffer, VkDeviceSize size,
                                    VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, uint32_t count = 1);
-    void WriteDescriptorBufferView(int binding, VkBufferView &buffer_view,
+    void WriteDescriptorBufferView(int binding, VkBufferView buffer_view,
                                    VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, uint32_t count = 1);
     void WriteDescriptorImageInfo(int binding, VkImageView image_view, VkSampler sampler,
                                   VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,

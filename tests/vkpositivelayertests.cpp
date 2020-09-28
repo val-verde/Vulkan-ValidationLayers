@@ -9697,6 +9697,19 @@ TEST_F(VkPositiveLayerTest, SwapchainExclusiveModeQueueFamilyPropertiesReference
     }
 }
 
+
+TEST_F(VkPositiveLayerTest, BufferOutOfBoundWithEnableRobustBufferAccess) {
+    TEST_DESCRIPTION("Validate if robustBufferAccess is enable, the out of bound of buffer is valid.");
+
+    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    m_errorMonitor->ExpectSuccess();
+    VkPhysicalDeviceFeatures features = {};
+    features.robustBufferAccess = VK_TRUE;
+    ASSERT_NO_FATAL_FAILURE(InitState(&features));
+    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    m_errorMonitor->VerifyNotFound();
+}
+
 // Android Hardware Buffer Positive Tests
 #ifdef VK_USE_PLATFORM_ANDROID_KHR
 #include "android_ndk_types.h"

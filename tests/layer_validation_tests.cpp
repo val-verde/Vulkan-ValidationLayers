@@ -1367,7 +1367,7 @@ void OneOffDescriptorSet::WriteDescriptorBufferInfo(int blinding, VkBuffer buffe
     descriptor_writes.emplace_back(descriptor_write);
 }
 
-void OneOffDescriptorSet::WriteDescriptorBufferView(int blinding, VkBufferView &buffer_view, VkDescriptorType descriptorType,
+void OneOffDescriptorSet::WriteDescriptorBufferView(int blinding, VkBufferView buffer_view, VkDescriptorType descriptorType,
                                                     uint32_t count) {
     const auto index = buffer_views.size();
 
