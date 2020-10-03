@@ -60,6 +60,7 @@ typedef struct {
 #ifdef INSTRUMENT_CORECHECKS
 
 static const std::vector<std::string> ApiIds = {
+    "vkQueuePresentKHR",
     "vkCreateInstance",
     "vkDestroyInstance",
     "vkEnumeratePhysicalDevices",
@@ -244,7 +245,6 @@ static const std::vector<std::string> ApiIds = {
     "vkDestroySwapchainKHR",
     "vkGetSwapchainImagesKHR",
     "vkAcquireNextImageKHR",
-    "vkQueuePresentKHR",
     "vkGetDeviceGroupPresentCapabilitiesKHR",
     "vkGetDeviceGroupSurfacePresentModesKHR",
     "vkGetPhysicalDevicePresentRectanglesKHR",
