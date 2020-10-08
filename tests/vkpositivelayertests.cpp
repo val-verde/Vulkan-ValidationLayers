@@ -2156,7 +2156,14 @@ TEST_F(VkPositiveLayerTest, SecondaryCommandBufferClearColorAttachments) {
     VkClearRect clear_rect = {{{0, 0}, {32, 32}}, 0, 1};
     vk::CmdClearAttachments(secondary_command_buffer, 1, &color_attachment, 1, &clear_rect);
     vk::EndCommandBuffer(secondary_command_buffer);
-    m_commandBuffer->begin();
+
+    //m_commandBuffer->begin();  Set pInheritance info to a bad value to test drivers
+    VkCommandBufferBeginInfo info = {};
+    info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    info.pInheritanceInfo = reinterpret_cast<VkCommandBufferInheritanceInfo*>((uint64_t)0x00000000cadecade);
+    vk::BeginCommandBuffer(m_commandBuffer->handle(), &info);
+
     vk::CmdBeginRenderPass(m_commandBuffer->handle(), &m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
     vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary_command_buffer);
     vk::CmdEndRenderPass(m_commandBuffer->handle());
