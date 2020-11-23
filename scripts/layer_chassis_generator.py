@@ -1929,6 +1929,8 @@ VK_LAYER_EXPORT VKAPI_ATTR VkResult VKAPI_CALL vkNegotiateLoaderLayerInterfaceVe
             post_call_record = post_call_record.replace(')', ', VkResult result)')
         elif resulttype.text == 'VkDeviceAddress':
             post_call_record = post_call_record.replace(')', ', VkDeviceAddress result)')
+        elif resulttype.text == 'VkDeviceSize':
+            post_call_record = post_call_record.replace(')', ', VkDeviceSize result)')
         return '        %s\n        %s\n        %s\n' % (pre_call_validate, pre_call_record, post_call_record)
     #
     # Command generation
