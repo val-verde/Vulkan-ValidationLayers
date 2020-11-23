@@ -206,6 +206,8 @@ class DispatchTableHelperOutputGenerator(OutputGenerator):
                 return_type = 'return 0;'
             elif decl.startswith('typedef VkBool32'):
                 return_type = 'return VK_FALSE;'
+            elif decl.startswith('typedef VkDeviceSize'):
+                return_type = 'return 0;';
             pre_decl, decl = decl.split('*PFN_vk')
             pre_decl = pre_decl.replace('typedef ', '')
             pre_decl = pre_decl.split(' (')[0]
