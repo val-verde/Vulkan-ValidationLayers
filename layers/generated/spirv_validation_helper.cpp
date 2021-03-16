@@ -239,9 +239,11 @@ static const std::unordered_multimap<uint32_t, RequiredSpirvInfo> spirvCapabilit
     {spv::CapabilityVariablePointersStorageBuffer, {0, &VkPhysicalDeviceVulkan11Features::variablePointersStorageBuffer, nullptr, ""}},
     {spv::CapabilityVulkanMemoryModel, {0, &VkPhysicalDeviceVulkan12Features::vulkanMemoryModel, nullptr, ""}},
     {spv::CapabilityVulkanMemoryModelDeviceScope, {0, &VkPhysicalDeviceVulkan12Features::vulkanMemoryModelDeviceScope, nullptr, ""}},
+  #ifdef ENABLE_AFTER_kSPV_KHR_workgroup_memory_explicit_layout_PRESENT_IN_SPIRV_HEADERS
     {spv::CapabilityWorkgroupMemoryExplicitLayout16BitAccessKHR, {0, &VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR::workgroupMemoryExplicitLayout16BitAccess, nullptr, ""}},
     {spv::CapabilityWorkgroupMemoryExplicitLayout8BitAccessKHR, {0, &VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR::workgroupMemoryExplicitLayout8BitAccess, nullptr, ""}},
     {spv::CapabilityWorkgroupMemoryExplicitLayoutKHR, {0, &VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR::workgroupMemoryExplicitLayout, nullptr, ""}},
+  #endif
 };
 // clang-format on
 
@@ -550,13 +552,15 @@ static inline const char* string_SpvCapability(uint32_t input_value) {
             return "VulkanMemoryModel";
          case spv::CapabilityVulkanMemoryModelDeviceScope:
             return "VulkanMemoryModelDeviceScope";
+       #ifdef ENABLE_AFTER_kSPV_KHR_workgroup_memory_explicit_layout_PRESENT_IN_SPIRV_HEADERS
          case spv::CapabilityWorkgroupMemoryExplicitLayout16BitAccessKHR:
             return "WorkgroupMemoryExplicitLayout16BitAccessKHR";
          case spv::CapabilityWorkgroupMemoryExplicitLayout8BitAccessKHR:
             return "WorkgroupMemoryExplicitLayout8BitAccessKHR";
          case spv::CapabilityWorkgroupMemoryExplicitLayoutKHR:
             return "WorkgroupMemoryExplicitLayoutKHR";
-        default:
+       #endif
+         default:
             return "Unhandled OpCapability";
     };
 };
